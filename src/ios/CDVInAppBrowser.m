@@ -236,14 +236,113 @@
 #ifdef __CORDOVA_4_0_0
     // the webview engine itself will filter for this according to <allow-navigation> policy
     // in config.xml for cordova-ios-4.0
-    [self.webViewEngine loadRequest:request];
+     NSString *fileExtension = [url.relativePath pathExtension];
+            if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame ||
+            [fileExtension caseInsensitiveCompare:@"TXT"] == NSOrderedSame)
+            {
+               [self loadEncoder:url.relativePath];
+            }
+            else
+            {
+               [self.webView loadRequest:request];
+            }
 #else
     if ([self.commandDelegate URLIsWhitelisted:url]) {
-        [self.webView loadRequest:request];
+         NSString *fileExtension = [url.relativePath pathExtension];
+                if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame ||
+                [fileExtension caseInsensitiveCompare:@"TXT"] == NSOrderedSame)
+                {
+                   [self loadEncoder:url.relativePath];
+                }
+                else
+                {
+                   [self.webView loadRequest:request];
+                }
     } else { // this assumes the InAppBrowser can be excepted from the white-list
         [self openInInAppBrowser:url withOptions:options];
     }
 #endif
+}
+
+-(void)loadEncoder:(NSString*) path
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+       // NSString *fileExtension = [path pathExtension];
+        NSString *encodeType = nil;
+        //if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame){
+           encodeType = [self decodeData2String:path];
+//        }
+//        else if([fileExtension caseInsensitiveCompare:@"html"] == NSOrderedSame ||
+//                [fileExtension caseInsensitiveCompare:@"htm"] == NSOrderedSame)
+//        {
+//            encodeType = [self getFileCharset:path];
+//        }
+        if(encodeType){
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSData *data = [NSData dataWithContentsOfFile:path];
+                NSString *str = [path lastPathComponent];
+                NSRange range = [path rangeOfString:str];
+                NSMutableString *mutablestr = [[NSMutableString alloc] initWithString:path];
+                [mutablestr deleteCharactersInRange:range];
+                NSURL *baseUrl = [NSURL fileURLWithPath:mutablestr];
+                NSLog(@"%@",baseUrl);
+                [self.webView loadData:data MIMEType:@"text/html" textEncodingName:encodeType baseURL:baseUrl];
+            });
+        }
+
+    });
+}
+
+#pragma mark 文本解码
+- (NSString *)decodeData2String:(NSString *)path
+{
+   NSStringEncoding enc = NSUTF8StringEncoding;
+    NSString * res = @"UTF-8";
+    // 假如txt文件带编码头，则获取头
+    NSString *txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+    if (!txtContent)
+    {
+        // GBK解码
+        enc = 0x80000632;
+        res = @"GBK";
+        txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+
+    }
+    if (!txtContent)
+    {
+        // GB18030解码
+        enc = 0x80000631;
+        txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+        res = @"GB18030";
+    }
+    if (!txtContent)
+    {
+        // ISO 8859-1 + GB 2312-80解码
+        NSStringEncoding gbkEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingEUC_CN);
+        NSStringEncoding isoEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingISOLatin1);
+        NSString *str = [NSString stringWithContentsOfFile:path encoding:isoEncoding error:nil];
+        NSData *name = [str dataUsingEncoding:isoEncoding];
+        txtContent = [[NSString alloc] initWithData:name encoding:gbkEncoding];
+        res = @"GBK";
+        NSLog(@"GB 2312-80解码 %@",txtContent);
+    }
+    if (!txtContent)
+    {
+        // ISO 8859-1 + GBK解码
+        NSStringEncoding enc = 0x80000632;
+        NSStringEncoding isoEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingISOLatin1);
+        NSString *str = [NSString stringWithContentsOfFile:path encoding:isoEncoding error:nil];
+        NSData *name = [str dataUsingEncoding:isoEncoding];
+        txtContent = [[NSString alloc] initWithData:name encoding:enc];
+        res = @"GBK";
+        NSLog(@"ISO 8859-1 %@",txtContent);
+    }
+    if (!txtContent)
+    {
+        res = @"UTF-8";
+    }
+
+    return res;
 }
 
 - (void)openInSystem:(NSURL*)url
@@ -785,16 +884,121 @@
     NSURLRequest* request = [NSURLRequest requestWithURL:url];
 
     if (_userAgentLockToken != 0) {
-        [self.webView loadRequest:request];
+
+        NSString *fileExtension = [url.relativePath pathExtension];
+        if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame ||
+        [fileExtension caseInsensitiveCompare:@"TXT"] == NSOrderedSame)
+        {
+           [self loadEncoder:url.relativePath];
+        }
+        else
+        {
+           [self.webView loadRequest:request];
+        }
+
+
     } else {
         __weak CDVInAppBrowserViewController* weakSelf = self;
         [CDVUserAgentUtil acquireLock:^(NSInteger lockToken) {
             _userAgentLockToken = lockToken;
             [CDVUserAgentUtil setUserAgent:_userAgent lockToken:lockToken];
-            [weakSelf.webView loadRequest:request];
+
+             NSString *fileExtension = [url.relativePath pathExtension];
+                    if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame ||
+                    [fileExtension caseInsensitiveCompare:@"TXT"] == NSOrderedSame)
+                    {
+                       [self loadEncoder:url.relativePath];
+                    }
+                    else
+                    {
+                       [self.webView loadRequest:request];
+                    }
         }];
     }
 }
+
+-(void)loadEncoder:(NSString*) path
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+       // NSString *fileExtension = [path pathExtension];
+        NSString *encodeType = nil;
+        //if([fileExtension caseInsensitiveCompare:@"txt"] == NSOrderedSame){
+           encodeType = [self decodeData2String:path];
+//        }
+//        else if([fileExtension caseInsensitiveCompare:@"html"] == NSOrderedSame ||
+//                [fileExtension caseInsensitiveCompare:@"htm"] == NSOrderedSame)
+//        {
+//            encodeType = [self getFileCharset:path];
+//        }
+        if(encodeType){
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSData *data = [NSData dataWithContentsOfFile:path];
+                NSString *str = [path lastPathComponent];
+                NSRange range = [path rangeOfString:str];
+                NSMutableString *mutablestr = [[NSMutableString alloc] initWithString:path];
+                [mutablestr deleteCharactersInRange:range];
+                NSURL *baseUrl = [NSURL fileURLWithPath:mutablestr];
+                NSLog(@"%@",baseUrl);
+                [self.webView loadData:data MIMEType:@"text/html" textEncodingName:encodeType baseURL:baseUrl];
+            });
+        }
+
+    });
+}
+
+#pragma mark 文本解码
+- (NSString *)decodeData2String:(NSString *)path
+{
+   NSStringEncoding enc = NSUTF8StringEncoding;
+    NSString * res = @"UTF-8";
+    // 假如txt文件带编码头，则获取头
+    NSString *txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+    if (!txtContent)
+    {
+        // GBK解码
+        enc = 0x80000632;
+        res = @"GBK";
+        txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+
+    }
+    if (!txtContent)
+    {
+        // GB18030解码
+        enc = 0x80000631;
+        txtContent = [NSString stringWithContentsOfFile:path usedEncoding:&enc error:nil];
+        res = @"GB18030";
+    }
+    if (!txtContent)
+    {
+        // ISO 8859-1 + GB 2312-80解码
+        NSStringEncoding gbkEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingEUC_CN);
+        NSStringEncoding isoEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingISOLatin1);
+        NSString *str = [NSString stringWithContentsOfFile:path encoding:isoEncoding error:nil];
+        NSData *name = [str dataUsingEncoding:isoEncoding];
+        txtContent = [[NSString alloc] initWithData:name encoding:gbkEncoding];
+        res = @"GBK";
+        NSLog(@"GB 2312-80解码 %@",txtContent);
+    }
+    if (!txtContent)
+    {
+        // ISO 8859-1 + GBK解码
+        NSStringEncoding enc = 0x80000632;
+        NSStringEncoding isoEncoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingISOLatin1);
+        NSString *str = [NSString stringWithContentsOfFile:path encoding:isoEncoding error:nil];
+        NSData *name = [str dataUsingEncoding:isoEncoding];
+        txtContent = [[NSString alloc] initWithData:name encoding:enc];
+        res = @"GBK";
+        NSLog(@"ISO 8859-1 %@",txtContent);
+    }
+    if (!txtContent)
+    {
+        res = @"UTF-8";
+    }
+
+    return res;
+}
+
+
 
 - (void)goBack:(id)sender
 {
@@ -998,12 +1202,6 @@
 
 @implementation CDVInAppBrowserNavigationController : UINavigationController
 
-- (void) dismissViewControllerAnimated:(BOOL)flag completion:(void (^)(void))completion {
-    if ( self.presentedViewController) {
-        [super dismissViewControllerAnimated:flag completion:completion];
-    }
-}
-
 - (void) viewDidLoad {
 
     CGRect frame = [UIApplication sharedApplication].statusBarFrame;
@@ -1025,8 +1223,8 @@
             CGFloat temp = rect.size.width;
             rect.size.width = rect.size.height;
             rect.size.height = temp;
+            rect.origin = CGPointZero;
         }
-        rect.origin = CGPointZero;
     }
     return rect;
 }

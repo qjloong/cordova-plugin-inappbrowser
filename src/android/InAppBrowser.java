@@ -19,6 +19,7 @@
 package org.apache.cordova.inappbrowser;
 
 import android.annotation.SuppressLint;
+import org.apache.cordova.inappbrowser.InAppBrowserDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.provider.Browser;
@@ -45,9 +46,8 @@ import android.webkit.HttpAuthHandler;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
@@ -99,6 +99,7 @@ public class InAppBrowser extends CordovaPlugin {
     private boolean clearSessionCache = false;
     private boolean hadwareBackButton = true;
     private boolean mediaPlaybackRequiresUserGesture = false;
+    private String encodeType ;
 
     /**
      * Executes the request and returns PluginResult.
@@ -117,7 +118,7 @@ public class InAppBrowser extends CordovaPlugin {
                 t = SELF;
             }
             final String target = t;
-            final HashMap<String, Boolean> features = parseFeature(args.optString(2));
+            final HashMap<String, String> features = parseFeature(args.optString(2));
 
             Log.d(LOG_TAG, "target = " + target);
 
@@ -315,18 +316,18 @@ public class InAppBrowser extends CordovaPlugin {
      * @param optString
      * @return
      */
-    private HashMap<String, Boolean> parseFeature(String optString) {
+    private HashMap<String, String> parseFeature(String optString) {
         if (optString.equals(NULL)) {
             return null;
         } else {
-            HashMap<String, Boolean> map = new HashMap<String, Boolean>();
+            HashMap<String, String> map = new HashMap<String, String>();
             StringTokenizer features = new StringTokenizer(optString, ",");
             StringTokenizer option;
             while(features.hasMoreElements()) {
                 option = new StringTokenizer(features.nextToken(), "=");
                 if (option.hasMoreElements()) {
                     String key = option.nextToken();
-                    Boolean value = option.nextToken().equals("no") ? Boolean.FALSE : Boolean.TRUE;
+                    String value = option.nextToken();
                     map.put(key, value);
                 }
             }
@@ -471,7 +472,7 @@ public class InAppBrowser extends CordovaPlugin {
      * @param url the url to load.
      * @param features jsonObject
      */
-    public String showWebPage(final String url, HashMap<String, Boolean> features) {
+    public String showWebPage(final String url, HashMap<String, String> features) {
         // Determine if we should hide the location bar.
         showLocationBar = true;
         showZoomControls = true;
@@ -479,33 +480,36 @@ public class InAppBrowser extends CordovaPlugin {
         mediaPlaybackRequiresUserGesture = false;
 
         if (features != null) {
-            Boolean show = features.get(LOCATION);
+
+            encodeType = features.get("encodetype");
+
+            String show = features.get(LOCATION);
             if (show != null) {
-                showLocationBar = show.booleanValue();
+                showLocationBar = show.equals("no")?false:true;
             }
-            Boolean zoom = features.get(ZOOM);
+            String zoom = features.get(ZOOM);
             if (zoom != null) {
-                showZoomControls = zoom.booleanValue();
+                showZoomControls = zoom.equals("no")?false:true;
             }
-            Boolean hidden = features.get(HIDDEN);
+            String hidden = features.get(HIDDEN);
             if (hidden != null) {
-                openWindowHidden = hidden.booleanValue();
+                openWindowHidden = hidden.equals("no")?false:true;
             }
-            Boolean hardwareBack = features.get(HARDWARE_BACK_BUTTON);
+            String hardwareBack = features.get(HARDWARE_BACK_BUTTON);
             if (hardwareBack != null) {
-                hadwareBackButton = hardwareBack.booleanValue();
+                hadwareBackButton = hardwareBack.equals("no")?false:true;
             }
-            Boolean mediaPlayback = features.get(MEDIA_PLAYBACK_REQUIRES_USER_ACTION);
+            String mediaPlayback = features.get(MEDIA_PLAYBACK_REQUIRES_USER_ACTION);
             if (mediaPlayback != null) {
-                mediaPlaybackRequiresUserGesture = mediaPlayback.booleanValue();
+                mediaPlaybackRequiresUserGesture = mediaPlayback.equals("no")?false:true;
             }
-            Boolean cache = features.get(CLEAR_ALL_CACHE);
+            String cache = features.get(CLEAR_ALL_CACHE);
             if (cache != null) {
-                clearAllCache = cache.booleanValue();
+                clearAllCache = cache.equals("no")?false:true;
             } else {
                 cache = features.get(CLEAR_SESSION_CACHE);
                 if (cache != null) {
-                    clearSessionCache = cache.booleanValue();
+                    clearSessionCache = cache.equals("no")?false:true;
                 }
             }
         }
@@ -564,7 +568,7 @@ public class InAppBrowser extends CordovaPlugin {
                 actionButtonContainer.setId(Integer.valueOf(1));
 
                 // Back button
-                ImageButton back = new ImageButton(cordova.getActivity());
+                Button back = new Button(cordova.getActivity());
                 RelativeLayout.LayoutParams backLayoutParams = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
                 backLayoutParams.addRule(RelativeLayout.ALIGN_LEFT);
                 back.setLayoutParams(backLayoutParams);
@@ -573,12 +577,14 @@ public class InAppBrowser extends CordovaPlugin {
                 Resources activityRes = cordova.getActivity().getResources();
                 int backResId = activityRes.getIdentifier("ic_action_previous_item", "drawable", cordova.getActivity().getPackageName());
                 Drawable backIcon = activityRes.getDrawable(backResId);
-                back.setBackground(null);
-                back.setImageDrawable(backIcon);
-                back.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                back.setPadding(0, this.dpToPixels(10), 0, this.dpToPixels(10));
-                back.getAdjustViewBounds();
-
+                if(android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.JELLY_BEAN)
+                {
+                    back.setBackgroundDrawable(backIcon);
+                }
+                else
+                {
+                    back.setBackground(backIcon);
+                }
                 back.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         goBack();
@@ -586,7 +592,7 @@ public class InAppBrowser extends CordovaPlugin {
                 });
 
                 // Forward button
-                ImageButton forward = new ImageButton(cordova.getActivity());
+                Button forward = new Button(cordova.getActivity());
                 RelativeLayout.LayoutParams forwardLayoutParams = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
                 forwardLayoutParams.addRule(RelativeLayout.RIGHT_OF, 2);
                 forward.setLayoutParams(forwardLayoutParams);
@@ -594,12 +600,14 @@ public class InAppBrowser extends CordovaPlugin {
                 forward.setId(Integer.valueOf(3));
                 int fwdResId = activityRes.getIdentifier("ic_action_next_item", "drawable", cordova.getActivity().getPackageName());
                 Drawable fwdIcon = activityRes.getDrawable(fwdResId);
-                forward.setBackground(null);
-                forward.setImageDrawable(fwdIcon);
-                forward.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                forward.setPadding(0, this.dpToPixels(10), 0, this.dpToPixels(10));
-                forward.getAdjustViewBounds();
-
+                if(android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.JELLY_BEAN)
+                {
+                    forward.setBackgroundDrawable(fwdIcon);
+                }
+                else
+                {
+                    forward.setBackground(fwdIcon);
+                }
                 forward.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         goForward();
@@ -630,7 +638,7 @@ public class InAppBrowser extends CordovaPlugin {
                 });
 
                 // Close/Done button
-                ImageButton close = new ImageButton(cordova.getActivity());
+                Button close = new Button(cordova.getActivity());
                 RelativeLayout.LayoutParams closeLayoutParams = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
                 closeLayoutParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
                 close.setLayoutParams(closeLayoutParams);
@@ -638,12 +646,14 @@ public class InAppBrowser extends CordovaPlugin {
                 close.setId(Integer.valueOf(5));
                 int closeResId = activityRes.getIdentifier("ic_action_remove", "drawable", cordova.getActivity().getPackageName());
                 Drawable closeIcon = activityRes.getDrawable(closeResId);
-                close.setBackground(null);
-                close.setImageDrawable(closeIcon);
-                close.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                back.setPadding(0, this.dpToPixels(10), 0, this.dpToPixels(10));
-                close.getAdjustViewBounds();
-
+                if(android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.JELLY_BEAN)
+                {
+                    close.setBackgroundDrawable(closeIcon);
+                }
+                else
+                {
+                    close.setBackground(closeIcon);
+                }
                 close.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         closeDialog();
@@ -663,13 +673,17 @@ public class InAppBrowser extends CordovaPlugin {
                 settings.setBuiltInZoomControls(showZoomControls);
                 settings.setPluginState(android.webkit.WebSettings.PluginState.ON);
 
+                if (encodeType != null ) {
+                    settings.setDefaultTextEncodingName(encodeType);
+                 }
+
                 if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     settings.setMediaPlaybackRequiresUserGesture(mediaPlaybackRequiresUserGesture);
                 }
 
                 String overrideUserAgent = preferences.getString("OverrideUserAgent", null);
                 String appendUserAgent = preferences.getString("AppendUserAgent", null);
-
+                
                 if (overrideUserAgent != null) {
                     settings.setUserAgentString(overrideUserAgent);
                 }
